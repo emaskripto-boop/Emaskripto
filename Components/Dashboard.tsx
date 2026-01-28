@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { AssetType, Transaction } from '../types';
+import { DatabaseService } from '../services/db';
 
 interface Order {
   id: string;
@@ -58,6 +58,145 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenSidebar, balance, se
     setTimeout(() => setNotification(null), 3000);
   };
 
+  const handleBuyFromMarket = (e: React.MouseEvent, tx: Transaction) => {
+    e.stopPropagation();
+    const cost = Number(tx.amount * tx.price);
+    
+    if (balance.usdt < cost) {
+      showToast(`Saldo tidak cukup! Butuh $${cost.toFixed(6)}`, 'error');
+      return;
+    }
+
+    const session = DatabaseService.getSession();
+    const currentUsername = session ? session.username : 'Saya';
+
+    const newTx: Transaction = {
+      id: 'TX-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
+      user: currentUsername,
+      amount: tx.amount,
+      price: tx.price,
+      profit: tx.profit || Math.floor(Math.random() * 5000 + 1000),
+      type: 'BUY',
+      timestamp: 'Baru saja',
+      asset: AssetType.GOLD
+    };
+
+    const newOrder: Order = {
+      id: newTx.id,
+      user: currentUsername,
+      amount: tx.amount,
+      price: tx.price,
+      profit: newTx.profit || 0,
+      status: 'COMPLETED',
+      timestamp: 'Baru saja',
+      isUserOrder: true,
+      type: 'BUY'
+    };
+    
+    setMyOrders(prev => [newOrder, ...prev]);
+    setBalance((prev: any) => ({ 
+      usdt: Number(prev.usdt) - cost, 
+      gold: Number(prev.gold) + Number(tx.amount) 
+    }));
+
+    // Tambahkan ke feed global
+    DatabaseService.addGlobalTransaction(newTx);
+    
+    showToast(`Berhasil membeli ${tx.amount.toFixed(6)} Emas!`);
+  };
+
+  const handleInstantBuy = () => {
+    const cost = 1.0; 
+    const amountToBuy = Number((cost / price).toFixed(6)); 
+
+    if (balance.usdt < cost) {
+      showToast(`Saldo tidak cukup untuk beli instan senilai $1!`, 'error');
+      return;
+    }
+
+    const session = DatabaseService.getSession();
+    const currentUsername = session ? session.username : 'Saya';
+
+    const newTx: Transaction = {
+      id: 'INST-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
+      user: currentUsername,
+      amount: amountToBuy,
+      price: price,
+      profit: Math.floor(Math.random() * 5000 + 2000),
+      type: 'BUY',
+      timestamp: 'Baru saja',
+      asset: AssetType.GOLD
+    };
+
+    const newOrder: Order = {
+      id: newTx.id,
+      user: currentUsername,
+      amount: amountToBuy,
+      price: price,
+      profit: newTx.profit || 0,
+      status: 'COMPLETED',
+      timestamp: 'Baru saja',
+      isUserOrder: true,
+      type: 'BUY'
+    };
+
+    setMyOrders(prev => [newOrder, ...prev]);
+    setBalance((prev: any) => ({ 
+      usdt: Number(prev.usdt) - cost, 
+      gold: Number(prev.gold) + amountToBuy 
+    }));
+
+    // Tambahkan ke feed global
+    DatabaseService.addGlobalTransaction(newTx);
+
+    showToast(`Beli Instan ${amountToBuy} Emas Berhasil!`);
+  };
+
+  const handleSellGold = () => {
+    if (balance.gold <= 0) {
+      showToast("Aset Emas Anda 0.00000.", "error");
+      return;
+    }
+    const amountToSell = balance.gold;
+    const currentPrice = price;
+    const usdtGained = amountToSell * currentPrice;
+    const potentialProfit = Math.floor(usdtGained * 15000);
+
+    const session = DatabaseService.getSession();
+    const currentUsername = session ? session.username : 'Saya';
+
+    const newTx: Transaction = {
+      id: 'SELL-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
+      user: currentUsername,
+      amount: amountToSell,
+      price: currentPrice,
+      profit: potentialProfit,
+      type: 'SELL',
+      timestamp: 'Baru saja',
+      asset: AssetType.GOLD
+    };
+
+    const newOrder: Order = {
+      id: newTx.id,
+      user: currentUsername,
+      amount: amountToSell,
+      price: currentPrice,
+      profit: potentialProfit,
+      status: 'PENDING',
+      timestamp: 'Baru saja',
+      isUserOrder: true,
+      type: 'SELL'
+    };
+
+    setMyOrders(prev => [newOrder, ...prev]);
+    setBalance((prev: any) => ({ ...prev, gold: 0, usdt: Number(prev.usdt) + usdtGained }));
+
+    // Tambahkan ke feed global
+    DatabaseService.addGlobalTransaction(newTx);
+
+    showToast(`Berhasil menjual aset emas! Status: PENDING`);
+  };
+
   const getStableProfile = (username: string): ProfileData => {
     if (profileCache[username]) return profileCache[username];
     const newData: ProfileData = {
@@ -81,90 +220,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenSidebar, balance, se
     if (!selectedUser) return null;
     return getStableProfile(selectedUser);
   }, [selectedUser]);
-
-  const handleBuyFromMarket = (e: React.MouseEvent, tx: Transaction) => {
-    e.stopPropagation();
-    const cost = Number(tx.amount * tx.price);
-    
-    if (balance.usdt < cost) {
-      showToast(`Saldo tidak cukup! Butuh $${cost.toFixed(6)}`, 'error');
-      return;
-    }
-
-    const newOrder: Order = {
-      id: Math.random().toString(36).substr(2, 9).toUpperCase(),
-      user: 'Saya',
-      amount: tx.amount,
-      price: tx.price,
-      profit: 0,
-      status: 'COMPLETED',
-      timestamp: 'Baru saja',
-      isUserOrder: true,
-      type: 'BUY'
-    };
-    
-    setMyOrders(prev => [newOrder, ...prev]);
-    setBalance((prev: any) => ({ 
-      usdt: Number(prev.usdt) - cost, 
-      gold: Number(prev.gold) + Number(tx.amount) 
-    }));
-    showToast(`Berhasil membeli ${tx.amount.toFixed(6)} Emas! Dipotong $${cost.toFixed(6)}`);
-  };
-
-  const handleInstantBuy = () => {
-    // Kita buat jumlah pembelian instan lebih besar agar saldo terlihat berkurang (misal $1 worth of gold)
-    const amountToBuy = Number((1 / price).toFixed(6)); 
-    const cost = 1.0; // Beli senilai $1
-
-    if (balance.usdt < cost) {
-      showToast(`Saldo tidak cukup untuk beli instan senilai $1!`, 'error');
-      return;
-    }
-
-    const newOrder: Order = {
-      id: 'INST-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
-      user: 'Saya',
-      amount: amountToBuy,
-      price: price,
-      profit: 0,
-      status: 'COMPLETED',
-      timestamp: 'Baru saja',
-      isUserOrder: true,
-      type: 'BUY'
-    };
-
-    setMyOrders(prev => [newOrder, ...prev]);
-    setBalance((prev: any) => ({ 
-      usdt: Number(prev.usdt) - cost, 
-      gold: Number(prev.gold) + amountToBuy 
-    }));
-    showToast(`Beli Instan ${amountToBuy} Emas Berhasil! Dipotong $${cost.toFixed(2)}`);
-  };
-
-  const handleSellGold = () => {
-    if (balance.gold <= 0) {
-      showToast("Aset Emas Anda 0.00000.", "error");
-      return;
-    }
-    const amountToSell = balance.gold;
-    const currentPrice = price;
-    const usdtGained = amountToSell * currentPrice;
-
-    const newOrder: Order = {
-      id: Math.random().toString(36).substr(2, 9).toUpperCase(),
-      user: 'Saya',
-      amount: amountToSell,
-      price: currentPrice,
-      profit: Number((usdtGained * 15000).toFixed(0)),
-      status: 'PENDING',
-      timestamp: 'Baru saja',
-      isUserOrder: true,
-      type: 'SELL'
-    };
-    setMyOrders(prev => [newOrder, ...prev]);
-    setBalance((prev: any) => ({ ...prev, gold: 0, usdt: Number(prev.usdt) + usdtGained }));
-    showToast(`Berhasil menjual aset emas! Status: PENDING`);
-  };
 
   return (
     <div className="flex flex-col min-h-screen pb-24">
@@ -263,7 +318,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenSidebar, balance, se
                 </div>
                 <div className="flex items-center space-x-3">
                    <button onClick={() => setSelectedUser(tx.user)} className="bg-gray-800/50 px-3 py-1.5 rounded-full text-[10px] font-black text-gray-400 border border-gray-700 hover:text-yellow-500 transition-colors">{tx.user}</button>
-                   <button onClick={(e) => handleBuyFromMarket(e, tx)} className="bg-yellow-500 text-black text-[10px] font-black px-4 py-1.5 rounded-lg border border-yellow-500 shadow-lg hover:bg-yellow-400 transition-all active:scale-90">BELI</button>
+                   {tx.type === 'BUY' && (
+                    <button onClick={(e) => handleBuyFromMarket(e, tx)} className="bg-yellow-500 text-black text-[10px] font-black px-4 py-1.5 rounded-lg border border-yellow-500 shadow-lg hover:bg-yellow-400 transition-all active:scale-90">BELI</button>
+                   )}
                 </div>
              </div>
            ))}
@@ -327,15 +384,4 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenSidebar, balance, se
                         <p className="text-[10px] text-gray-600 font-black uppercase">Harga Beli</p>
                         <p className="text-white font-black text-lg">${order.price.toFixed(4)}</p>
                       </div>
-                    </div>
-                    <div className="pt-4 border-t border-gray-800 flex justify-between text-[10px] text-gray-600 font-bold uppercase tracking-widest"><span>{order.timestamp}</span><span>ID: #{order.id}</span></div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+                    </d

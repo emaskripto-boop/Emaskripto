@@ -1,5 +1,4 @@
-
-import { UserAccount, Transaction, UserStats, Deposit, Withdrawal } from '../types';
+import { UserAccount, Transaction, UserStats, Deposit, Withdrawal, AssetType } from '../types';
 
 const DB_KEY = 'cryptogold_db_v1';
 const SESSION_KEY = 'cryptogold_session_v1';
@@ -19,8 +18,8 @@ export const DatabaseService = {
     
     return {
       newUsers: [
-        { name: 'Nelson5030', joined: '2 minutes ago' },
-        { name: 'TraderX', joined: '7 minutes ago' },
+        { name: 'Nelson5030', joined: '2 menit yang lalu' },
+        { name: 'TraderX', joined: '7 menit yang lalu' },
       ],
       deposits: [],
       withdrawals: [],
@@ -32,7 +31,15 @@ export const DatabaseService = {
     const current = DatabaseService.getGlobalStats();
     const updated = { ...current, ...newStats };
     localStorage.setItem(STATS_KEY, JSON.stringify(updated));
+    // Trigger storage event for other tabs/listeners
+    window.dispatchEvent(new Event('storage'));
     return updated;
+  },
+
+  addGlobalTransaction: (tx: Transaction) => {
+    const stats = DatabaseService.getGlobalStats();
+    const updatedTransactions = [tx, ...stats.transactions].slice(0, 50);
+    DatabaseService.updateGlobalStats({ transactions: updatedTransactions });
   },
 
   saveUser: async (user: UserAccount) => {
@@ -46,7 +53,6 @@ export const DatabaseService = {
     localStorage.setItem(DB_KEY, JSON.stringify(users));
   },
 
-  // Admin: Approve atau Reject Deposit
   processDeposit: async (depositId: string, status: 'COMPLETED' | 'FAILED'): Promise<void> => {
     const stats = DatabaseService.getGlobalStats();
     const deposits = [...stats.deposits];
@@ -69,7 +75,6 @@ export const DatabaseService = {
     }
   },
 
-  // Admin: Approve atau Reject Withdrawal
   processWithdrawal: async (withdrawalId: string, status: 'COMPLETED' | 'FAILED'): Promise<void> => {
     const stats = DatabaseService.getGlobalStats();
     const withdrawals = [...stats.withdrawals];
@@ -109,7 +114,6 @@ export const DatabaseService = {
     const cleanUsername = username.trim();
     const cleanRefCode = referralCode?.trim().toUpperCase();
     
-    // PENGECEKAN USERNAME GANDA (Case-Insensitive)
     if (users.find(u => u.username.toLowerCase() === cleanUsername.toLowerCase())) {
       throw new Error("Username sudah digunakan! Silakan gunakan nama lain.");
     }
@@ -147,15 +151,11 @@ export const DatabaseService = {
     localStorage.setItem(SESSION_KEY, cleanUsername);
 
     const stats = DatabaseService.getGlobalStats();
-    const isAlreadyInStats = stats.newUsers.some(u => u.name.toLowerCase() === cleanUsername.toLowerCase());
-    
-    if (!isAlreadyInStats) {
-      const updatedStats = {
-        ...stats,
-        newUsers: [{ name: cleanUsername, joined: 'Baru saja' }, ...stats.newUsers].slice(0, 15)
-      };
-      DatabaseService.updateGlobalStats(updatedStats);
-    }
+    const updatedStats = {
+      ...stats,
+      newUsers: [{ name: cleanUsername, joined: 'Baru saja' }, ...stats.newUsers].slice(0, 15)
+    };
+    DatabaseService.updateGlobalStats(updatedStats);
 
     return newUser;
   },
@@ -170,4 +170,4 @@ export const DatabaseService = {
     localStorage.removeItem(SESSION_KEY);
   }
 };
-	
+	  

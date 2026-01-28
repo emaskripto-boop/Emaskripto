@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Auth } from './components/Auth';
 import { Dashboard } from './components/Dashboard';
@@ -44,6 +43,12 @@ const App: React.FC = () => {
   const [stats, setStats] = useState<UserStats>(DatabaseService.getGlobalStats());
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
 
+  const refreshStats = useCallback(() => {
+    setStats(DatabaseService.getGlobalStats());
+    const user = DatabaseService.getSession();
+    if (user) setCurrentUser(user);
+  }, []);
+
   useEffect(() => {
     const initSession = async () => {
       const user = DatabaseService.getSession();
@@ -51,24 +56,21 @@ const App: React.FC = () => {
         setCurrentUser(user);
         setIsLoggedIn(true);
       }
-      setStats(DatabaseService.getGlobalStats());
+      refreshStats();
       setLoading(false);
     };
     initSession();
-  }, []);
+
+    // Listen to global changes in storage
+    window.addEventListener('storage', refreshStats);
+    return () => window.removeEventListener('storage', refreshStats);
+  }, [refreshStats]);
 
   useEffect(() => {
     if (isLoggedIn && currentUser) {
       DatabaseService.saveUser(currentUser);
     }
   }, [currentUser, isLoggedIn]);
-
-  const refreshStats = () => {
-    const updatedStats = DatabaseService.getGlobalStats();
-    setStats(updatedStats);
-    const user = DatabaseService.getSession();
-    if (user) setCurrentUser(user);
-  };
 
   // --- BOT SYSTEM ---
   useEffect(() => {
@@ -93,10 +95,10 @@ const App: React.FC = () => {
           timestamp: 'Baru saja',
           asset: AssetType.GOLD
         };
-        updatedStats.transactions = [newTx, ...updatedStats.transactions].slice(0, 25);
+        updatedStats.transactions = [newTx, ...updatedStats.transactions].slice(0, 30);
       }
 
-      if (rand < 0.2) {
+      if (rand < 0.1) {
         const newDep: Deposit = {
           id: 'DEP-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
           user: randomUser(),
@@ -108,19 +110,7 @@ const App: React.FC = () => {
         updatedStats.deposits = [newDep, ...updatedStats.deposits].slice(0, 20);
       }
 
-      if (rand < 0.1) {
-        const newWit: Withdrawal = {
-          id: 'WD-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
-          user: randomUser(),
-          amount: Math.floor(Math.random() * 50) + 10,
-          currency: 'USDT (TRC20)',
-          timestamp: 'Baru saja',
-          status: 'COMPLETED'
-        };
-        updatedStats.withdrawals = [newWit, ...updatedStats.withdrawals].slice(0, 20);
-      }
-
-      if (rand > 0.85) {
+      if (rand > 0.9) {
         const newUserBot = { name: randomUser(), joined: 'Baru saja' };
         if (updatedStats.newUsers[0]?.name !== newUserBot.name) {
           updatedStats.newUsers = [newUserBot, ...updatedStats.newUsers].slice(0, 15);
@@ -150,6 +140,7 @@ const App: React.FC = () => {
         setCurrentUser(user);
         setIsLoggedIn(true);
       }
+      refreshStats();
     } catch (error: any) {
       setLoading(false);
       throw error; 
@@ -166,7 +157,6 @@ const App: React.FC = () => {
     setCurrentView('TRADE');
   };
 
-  // PERBAIKAN: Fungsi updateBalance yang lebih kuat
   const updateBalance = useCallback((updater: any) => {
     setCurrentUser(prev => {
       if (!prev) return null;
@@ -233,3 +223,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+  
